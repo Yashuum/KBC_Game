@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>KBC Game by Yash</title>
+<style>
+  /* Basic blue/gold KBC style */
+  body {
+    margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #001F4D, #FFD700);
+    color: #fff;
+    display: flex; justify-content: center; align-items: center;
+    min-height: 100vh;
+  }
+  #landing-page, #quiz-container, #cheque-overlay {
+    width: 320px;
+    background: #002A6B;
+    border-radius: 10px;
+    box-shadow: 0 0 20px #FFD700AA;
+    padding: 20px;
+    box-sizing: border-box;
+  }
+  #landing-page {
+    text-align: center;
+  }
+  button {
+    background: #FFD700; color: #002A6B; border: none; border-radius: 5px;
+    font-size: 18px; padding: 10px 20px; cursor: pointer;
+    transition: background 0.3s ease;
+    margin-top: 15px;
+  }
+  button:hover:not(:disabled) {
+    background: #FFC107;
+  }
+  button:disabled {
+    background: #AAA;
+    cursor: not-allowed;
+  }
+  #quiz-container {
+    display: none;
+    flex-direction: column;
+  }
+  #question-text {
+    font-size: 20px;
+    margin-bottom: 15px;
+    min-height: 60px;
+  }
+  #answers {
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  #answers button {
+    font-size: 16px;
+    padding: 10px;
+    text-align: left;
+  }
+  #prize-ladder {
+    margin-top: 20px;
+    background: #003B8D;
+    border-radius: 8px;
+    padding: 10px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 14px;
+  }
+  .prize-step {
+    padding: 5px 10px;
+    border-radius: 5px;
+    margin-bottom: 3px;
+  }
+  .prize-step.current {
+    background: #FFD700;
+    color: #002A6B;
+    font-weight: bold;
+  }
+  #lifelines {
+    margin-top: 20px;
+    display: flex; justify-content: space-between;
+  }
+  #lifelines button {
+    flex: 1;
+    margin: 0 3px;
+    font-size: 14px;
+    padding: 8px 5px;
+  }
+  #current-winnings {
+    margin-top: 15px;
+    font-size: 18px;
+    text-align: center;
+  }
+  /* Popup */
+  #popup {
+    position: fixed;
+    top: 40%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #FFD700;
+    color: #002A6B;
+    padding: 20px 30px;
+    border-radius: 10px;
+    font-weight: bold;
+    font-size: 20px;
+    box-shadow: 0 0 20px #FFD700AA;
+    display: none;
+    z-index: 10;
+    text-align: center;
+  }
+  /* Cheque overlay */
+  #cheque-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.8);
+    display: none;
+    justify-content: center; align-items: center;
+    flex-direction: column;
+    color: #002A6B;
+  }
+  #cheque {
+    background: #fff8dc;
+    width: 300px;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 0 25px #333;
+    font-family: 'Courier New', Courier, monospace;
+    text-align: center;
+  }
+  #cheque h2 {
+    margin: 0 0 10px;
+  }
+  #cheque p {
+    margin: 8px 0;
+    font-size: 16px;
+  }
+  #cheque input {
+    font-size: 16px;
+    padding: 5px;
+    width: 90%;
+    margin: 10px 0 20px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    text-align: center;
+  }
+  #cheque button {
+    width: 100%;
+    padding: 10px;
+    background: #002A6B;
+    color: #FFD700;
+    font-weight: bold;
+    border-radius: 6px;
+  }
+  #copyright-text {
+    margin-top: 15px;
+    font-size: 12px;
+    color: #666;
+  }
+</style>
+</head>
+<body>
+
+<!-- Landing Page -->
+<div id="landing-page" role="main" aria-label="Landing page">
+  <h1>KBC Game by Yash</h1>
+  <button id="start-btn" aria-label="Start KBC Quiz">Start KBC Quiz</button>
+</div>
+
+<!-- Quiz Container -->
+<div id="quiz-container" role="main" aria-label="Quiz container" aria-hidden="true" style="display:none; flex-direction: column;">
+  <div id="question-text" aria-live="polite"></div>
+  <div id="answers" role="list"></div>
+  <div id="lifelines" aria-label="Lifelines">
+    <button id="fifty-fifty-btn" aria-pressed="false" aria-label="Use fifty fifty lifeline">50:50</button>
+    <button id="phone-btn" aria-pressed="false" aria-label="Use phone a friend lifeline">Phone a Friend</button>
+    <button id="audience-btn" aria-pressed="false" aria-label="Use audience poll lifeline">Audience Poll</button>
+    <button id="skip-btn" aria-pressed="false" aria-label="Use skip question lifeline">Skip</button>
+  </div>
+  <div id="current-winnings" aria-live="polite">Current Winnings: ₹0</div>
+  <div id="prize-ladder" aria-label="Prize money ladder"></div>
+</div>
+
+<!-- Popup -->
+<div id="popup" role="alert" aria-live="assertive"></div>
+
+<!-- Cheque Overlay -->
+<div id="cheque-overlay" aria-hidden="true">
+  <div id="cheque">
+    <h2>Cheque for your Winnings</h2>
+    <p>Amount: <span id="cheque-amount">₹0</span></p>
+    <input type="text" id="player-name" placeholder="Enter your name" aria-label="Player name" />
+    <button id="generate-cheque-btn">Generate Cheque</button>
+    <div id="generated-cheque" style="margin-top:15px; white-space: pre-wrap; font-family: monospace;"></div>
+    <button id="close-cheque-btn" style="margin-top:20px;">Close</button>
+    <div id="copyright-text">© NISHU</div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const landingPage = document.getElementById('landing-page');
+  const startBtn = document.getElementById('start-btn');
+  const quizContainer = document.getElementById('quiz-container');
+  const questionText = document.getElementById('question-text');
+  const answersEl = document.getElementById('answers');
+  const prizeLadderEl = document.getElementById('prize-ladder');
+  const currentWinningsEl = document.getElementById('current-winnings');
+  const popup = document.getElementById('popup');
+
+  const lifelines = {
+    fifty: document.getElementById('fifty-fifty-btn'),
+    phone: document.getElementById('phone-btn'),
+    audience: document.getElementById('audience-btn'),
+    skip: document.getElementById('skip-btn'),
+  };
+
+  const chequeOverlay = document.getElementById('cheque-overlay');
+  const chequeAmountEl = document.getElementById('cheque-amount');
+  const playerNameInput = document.getElementById('player-name');
+  const generateChequeBtn = document.getElementById('generate-cheque-btn');
+  const generatedChequeEl = document.getElementById('generated-cheque');
+  const closeChequeBtn = document.getElementById('close-cheque-btn');
+
+  let questionBank = [];
+  let sessionQuestions = []; // Only 15 unique questions per game
+  let prizeMoney = [];
+  let currentQuestionIndex = 0;
+  let winnings = 0;
+  let usedLifelines = {
+    fifty: false,
+    phone: false,
+    audience: false,
+    skip: false,
+  };
+
+  const questionBank = [
+  { q: "Capital of India?", a: ["Mumbai", "Chennai", "Delhi", "Kolkata"], correct: 2 },
+  { q: "Current President of India?", a: ["Narendra Modi", "Ram Nath Kovind", "Pranab Mukherjee", "Droupadi Murmu"], correct: 3 },
+  { q: "Who won the 2011 Cricket World Cup?", a: ["England", "India", "Australia", "South Africa"], correct: 1 },
+  { q: "What is the national animal of India?", a: ["Tiger", "Elephant", "Peacock", "Lion"], correct: 0 },
+  { q: "Who wrote 'Ramayana'?", a: ["Tulsidas", "Valmiki", "Kabir", "Kalidasa"], correct: 1 },
+  { q: "Which city is called the Pink City?", a: ["Jaipur", "Chandigarh", "Jodhpur", "Udaipur"], correct: 0 },
+  { q: "Which river is the longest in India?", a: ["Ganga", "Yamuna", "Godavari", "Brahmaputra"], correct: 2 },
+  { q: "Who is the father of the Indian Constitution?", a: ["Jawaharlal Nehru", "B. R. Ambedkar", "Mahatma Gandhi", "Sardar Patel"], correct: 1 },
+  { q: "When did India get independence?", a: ["1935", "1950", "1947", "1945"], correct: 2 },
+  { q: "National sport of India?", a: ["Cricket", "Football", "Hockey", "Kabaddi"], correct: 2 },
+  { q: "First Prime Minister of India?", a: ["Lal Bahadur Shastri", "Rajendra Prasad", "Jawaharlal Nehru", "Mahatma Gandhi"], correct: 2 },
+  { q: "Smallest state in India by area?", a: ["Tripura", "Goa", "Sikkim", "Manipur"], correct: 1 },
+  { q: "Chemical symbol for Gold?", a: ["Gd", "Au", "Ag", "Go"], correct: 1 },
+  { q: "Powerhouse of the cell?", a: ["Mitochondria", "Lysosome", "Nucleus", "Ribosome"], correct: 0 },
+  { q: "Red Planet?", a: ["Venus", "Saturn", "Mars", "Jupiter"], correct: 2 },
+  { q: "Where is the Taj Mahal?", a: ["Agra", "Jaipur", "Lucknow", "Delhi"], correct: 0 },
+  { q: "Gas used in photosynthesis?", a: ["Oxygen", "Carbon Dioxide", "Hydrogen", "Nitrogen"], correct: 1 },
+  { q: "Who discovered gravity?", a: ["Galileo Galilei", "Albert Einstein", "Stephen Hawking", "Isaac Newton"], correct: 3 },
+  { q: "Largest bone in the human body?", a: ["Femur", "Tibia", "Skull", "Humerus"], correct: 0 },
+  { q: "Formula of water?", a: ["NaCl", "CO2", "H2O", "O2"], correct: 2 },
+  { q: "Largest desert in the world?", a: ["Kalahari", "Sahara", "Thar", "Gobi"], correct: 1 },
+  { q: "First President of India?", a: ["Sarvepalli Radhakrishnan", "Zakir Hussain", "Dr. Rajendra Prasad", "APJ Abdul Kalam"], correct: 2 },
+  { q: "The 'Dark Continent'?", a: ["Asia", "Africa", "Europe", "Australia"], correct: 1 },
+  { q: "Who invented the telephone?", a: ["Nikola Tesla", "Thomas Edison", "Isaac Newton", "Alexander Graham Bell"], correct: 3 },
+  { q: "Longest mountain range?", a: ["Himalayas", "Andes", "Rockies", "Alps"], correct: 1 },
+  { q: "Slogan 'Do or Die'?", a: ["Subhas Chandra Bose", "Mahatma Gandhi", "Jawaharlal Nehru", "Bhagat Singh"], correct: 1 },
+  { q: "Largest gland in the human body?", a: ["Liver", "Thyroid", "Pancreas", "Pituitary"], correct: 0 },
+  { q: "State with highest literacy?", a: ["Kerala", "Goa", "Tamil Nadu", "Delhi"], correct: 0 },
+  { q: "Hardest natural substance?", a: ["Quartz", "Gold", "Diamond", "Iron"], correct: 2 },
+  { q: "Capital of Australia?", a: ["Canberra", "Melbourne", "Perth", "Sydney"], correct: 0 },
+  { q: "Animals that eat both plants and animals?", a: ["Carnivores", "Omnivores", "Herbivores", "Insectivores"], correct: 1 },
+  { q: "Who discovered penicillin?", a: ["Marie Curie", "Louis Pasteur", "Alexander Fleming", "Edward Jenner"], correct: 2 },
+  { q: "Silicon Valley of India?", a: ["Chennai", "Hyderabad", "Pune", "Bangalore"], correct: 3 },
+  { q: "Year of Quit India Movement?", a: ["1942", "1947", "1919", "1930"], correct: 0 },
+  { q: "National aquatic animal of India?", a: ["Crocodile", "Turtle", "Shark", "River Dolphin"], correct: 3 },
+  { q: "Founder of Indian National Army?", a: ["Bhagat Singh", "Lala Lajpat Rai", "Mahatma Gandhi", "Subhas Chandra Bose"], correct: 3 },
+  { q: "Most abundant element in Earth’s crust?", a: ["Oxygen", "Iron", "Aluminum", "Silicon"], correct: 0 },
+  { q: "Vitamin from sunlight?", a: ["Vitamin A", "Vitamin D", "Vitamin C", "Vitamin B12"], correct: 1 },
+  { q: "Country with longest border with India?", a: ["Pakistan", "Bangladesh", "China", "Nepal"], correct: 1 },
+  { q: "Organ that purifies blood?", a: ["Liver", "Heart", "Kidney", "Lungs"], correct: 2 },
+  { q: "Process by which plants make food?", a: ["Transpiration", "Fermentation", "Respiration", "Photosynthesis"], correct: 3 },
+  { q: "Ceylon is the old name of?", a: ["Thailand", "Sri Lanka", "Myanmar", "Maldives"], correct: 1 },
+  { q: "Instrument to measure earthquakes?", a: ["Barometer", "Seismograph", "Thermometer", "Hygrometer"], correct: 1 },
+  { q: "First Indian Nobel laureate?", a: ["C.V. Raman", "Rabindranath Tagore", "Mother Teresa", "Amartya Sen"], correct: 1 },
+  { q: "Organ producing insulin?", a: ["Kidney", "Liver", "Heart", "Pancreas"], correct: 3 },
+  { q: "Planet with rings?", a: ["Uranus", "Neptune", "Jupiter", "Saturn"], correct: 3 },
+  { q: "First woman Governor of Indian state?", a: ["Sarojini Naidu", "Pratibha Patil", "Indira Gandhi", "Vijaya Lakshmi Pandit"], correct: 0 },
+  { q: "Acid found in lemon?", a: ["Lactic acid", "Acetic acid", "Citric acid", "Oxalic acid"], correct: 2 }
+];
+
+
+  while (questionBank.length < 100) {
+    questionBank = questionBank.concat(questionBank.slice(0, 10));
+  }
+  questionBank.length = 100;
+
+  prizeMoney = [
+    "₹1,000", "₹2,000", "₹3,000", "₹5,000", "₹10,000",
+    "₹20,000", "₹40,000", "₹80,000", "₹1,60,000", "₹3,20,000",
+    "₹6,40,000", "₹12,50,000", "₹25,00,000", "₹50,00,000", "₹1,00,00,000"
+  ];
+
+  function shuffle(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+  }
+
+  function disableAllAnswers() {
+    answersEl.querySelectorAll('button').forEach(btn => btn.disabled = true);
+  }
+
+  function enableAllAnswers() {
+    answersEl.querySelectorAll('button').forEach(btn => {
+      btn.disabled = false;
+      btn.style.opacity = "1";
+      btn.style.backgroundColor = "#FFD700";
+      btn.style.color = "#002A6B";
+    });
+  }
+
+  function renderPrizeLadder() {
+    prizeLadderEl.innerHTML = "";
+    prizeMoney.forEach((amount, idx) => {
+      const div = document.createElement('div');
+      div.textContent = `${idx + 1}. ${amount}`;
+      div.className = "prize-step";
+      if (idx === currentQuestionIndex) div.classList.add('current');
+      prizeLadderEl.appendChild(div);
+    });
+  }
+
+  let popupTimeout;
+  function showPopup(msg, seconds, callback) {
+    clearTimeout(popupTimeout);
+    popup.textContent = msg;
+    popup.style.display = 'block';
+    popupTimeout = setTimeout(() => {
+      popup.style.display = 'none';
+      if (callback) callback();
+    }, seconds * 1000);
+  }
+
+  function showLifelinePopup(msg) {
+    showPopup(msg, 3);
+  }
+
+  function highlightCorrectAnswer() {
+    const correctIdx = sessionQuestions[currentQuestionIndex].correct;
+    answersEl.querySelectorAll('button').forEach((btn, idx) => {
+      if(idx === correctIdx) btn.style.backgroundColor = '#228B22';
+      else btn.style.backgroundColor = '#B22222';
+      btn.disabled = true;
+    });
+  }
+
+  function renderQuestion() {
+    if (currentQuestionIndex >= 15) {
+      endGame();
+      return;
+    }
+
+    enableAllAnswers();
+    renderPrizeLadder();
+    currentWinningsEl.textContent = `Current Winnings: ${winnings || "₹0"}`;
+
+    const question = sessionQuestions[currentQuestionIndex];
+    questionText.textContent = question.q;
+
+    answersEl.innerHTML = "";
+    question.a.forEach((answer, idx) => {
+      const btn = document.createElement('button');
+      btn.textContent = answer;
+      btn.setAttribute('data-index', idx);
+      btn.style.backgroundColor = '#FFD700';
+      btn.style.color = '#002A6B';
+      btn.addEventListener('click', (e) => handleAnswerClick(idx, e));
+      answersEl.appendChild(btn);
+    });
+  }
+
+  function handleAnswerClick(selectedIndex, e) {
+    disableAllAnswers();
+
+    const correctIndex = sessionQuestions[currentQuestionIndex].correct;
+    if (selectedIndex === correctIndex) {
+      e.target.style.backgroundColor = '#228B22';
+      winnings = prizeMoney[currentQuestionIndex];
+      showPopup(`Correct! You won ${winnings}`, 3, () => {
+        currentQuestionIndex++;
+        renderQuestion();
+      });
+    } else {
+      e.target.style.backgroundColor = '#B22222';
+      highlightCorrectAnswer();
+      showPopup('Wrong Answer! Game Over.', 3, endGame);
+    }
+  }
+
+  function useFiftyFifty() {
+    if (usedLifelines.fifty) return showLifelinePopup("50:50 already used.");
+    usedLifelines.fifty = true;
+    lifelines.fifty.disabled = true;
+
+    const correctIndex = sessionQuestions[currentQuestionIndex].correct;
+    const buttons = Array.from(answersEl.querySelectorAll('button'));
+    const incorrectIndexes = buttons.map((btn, i) => i).filter(i => i !== correctIndex);
+    shuffle(incorrectIndexes);
+    const toDisable = incorrectIndexes.slice(0, incorrectIndexes.length - 1);
+
+    buttons.forEach((btn, idx) => {
+      if (toDisable.includes(idx)) {
+        btn.disabled = true;
+        btn.style.opacity = "0.4";
+      }
+    });
+
+    showLifelinePopup("50:50 used. Two incorrect answers removed.");
+  }
+
+  function usePhoneAFriend() {
+    if (usedLifelines.phone) return showLifelinePopup("Phone a Friend already used.");
+    usedLifelines.phone = true;
+    lifelines.phone.disabled = true;
+
+    const correctIndex = sessionQuestions[currentQuestionIndex].correct;
+    const suggestedAnswer = Math.random() <= 0.8 ? correctIndex :
+      [0,1,2,3].filter(i => i !== correctIndex)[Math.floor(Math.random()*3)];
+    showLifelinePopup(`Friend suggests: "${sessionQuestions[currentQuestionIndex].a[suggestedAnswer]}"`);
+  }
+
+  function useAudiencePoll() {
+    if (usedLifelines.audience) return showLifelinePopup("Audience Poll already used.");
+    usedLifelines.audience = true;
+    lifelines.audience.disabled = true;
+
+    const correctIndex = sessionQuestions[currentQuestionIndex].correct;
+    const correctPercent = 60 + Math.floor(Math.random() * 21);
+    let remaining = 100 - correctPercent;
+    const incorrect = [0,1,2,3].filter(i => i !== correctIndex);
+    const dist = [0,0,0];
+
+    for (let i = 0; i < 2; i++) {
+      dist[i] = Math.floor(Math.random() * (remaining + 1));
+      remaining -= dist[i];
+    }
+    dist[2] = remaining;
+
+    let msg = "Audience Poll:\n";
+    [0,1,2,3].forEach((i, idx) => {
+      const percent = (i === correctIndex) ? correctPercent : dist.shift();
+      msg += `${sessionQuestions[currentQuestionIndex].a[i]}: ${percent}%\n`;
+    });
+
+    showLifelinePopup(msg);
+  }
+
+  function useSkip() {
+    if (usedLifelines.skip) return showLifelinePopup("Skip already used.");
+    usedLifelines.skip = true;
+    lifelines.skip.disabled = true;
+    showPopup("Question skipped!", 2, () => {
+      currentQuestionIndex++;
+      renderQuestion();
+    });
+  }
+
+  lifelines.fifty.addEventListener('click', useFiftyFifty);
+  lifelines.phone.addEventListener('click', usePhoneAFriend);
+  lifelines.audience.addEventListener('click', useAudiencePoll);
+  lifelines.skip.addEventListener('click', useSkip);
+
+  function endGame() {
+    quizContainer.style.display = 'none';
+    chequeOverlay.style.display = 'flex';
+    chequeOverlay.setAttribute('aria-hidden', 'false');
+    chequeAmountEl.textContent = winnings || '₹0';
+    playerNameInput.value = '';
+    generatedChequeEl.textContent = '';
+  }
+
+  generateChequeBtn.addEventListener('click', () => {
+    const name = playerNameInput.value.trim();
+    if (!name) {
+      alert('Please enter your name.');
+      playerNameInput.focus();
+      return;
+    }
+    const chequeText =
+`+-------------------------------------------+
+|             PAY TO THE ORDER OF            |
+|                                           |
+|             ${name.padEnd(25)}          |
+|                                           |
+|             AMOUNT: ${winnings || '₹0'}             |
+|                                           |
+|       From: YASHWANT SINGH                 |
+|                                           |
+|        © NISHU - KBC Game by Yash          |
++-------------------------------------------+`;
+    generatedChequeEl.textContent = chequeText;
+  });
+
+  closeChequeBtn.addEventListener('click', () => {
+    chequeOverlay.style.display = 'none';
+    resetGame();
+  });
+
+  function resetGame() {
+    winnings = 0;
+    currentQuestionIndex = 0;
+    usedLifelines = { fifty: false, phone: false, audience: false, skip: false };
+    Object.values(lifelines).forEach(btn => {
+      btn.disabled = false;
+      btn.setAttribute('aria-pressed', 'false');
+    });
+    landingPage.style.display = 'block';
+    quizContainer.style.display = 'none';
+    chequeOverlay.style.display = 'none';
+  }
+
+  startBtn.addEventListener('click', () => {
+    landingPage.style.display = 'none';
+    quizContainer.style.display = 'flex';
+    winnings = 0;
+    currentQuestionIndex = 0;
+    usedLifelines = { fifty: false, phone: false, audience: false, skip: false };
+    Object.values(lifelines).forEach(btn => {
+      btn.disabled = false;
+      btn.setAttribute('aria-pressed', 'false');
+    });
+    shuffle(questionBank);
+    sessionQuestions = questionBank.slice(0, 15); // Unique set of 15
+    renderQuestion();
+  });
+
+})();
+</script>
+
+
+</body>
+</html>
